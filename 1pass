@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+# 1Password helper.
+#
+
+function usage()
+{
+    echo "usage: 1pass item
+
+Return the password for the given 1Password item.
+" >&2
+    exit 1
+}
+
+function op_validate_query()
+{
+    local op_key="$1" op_field="$2" op_status="$3" op_value="$4"
+    if [[ "$op_value" == "" || $op_status -ne 0 ]]; then
+	echo "Cannot get $op_field for $op_key" >&2
+	exit 1
+    fi
+    echo "$op_value"
+}
+
+function get_op_item_field()
+{
+    local item_key="$1"
+    local item_field_type="$2"
+    local item_field="$3"
+    local op_value="$(op get item "$item_key" 2>/dev/null | jq -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value')"
+    local op_status=${PIPESTATUS[0]}
+    op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
+}
+
+function get_op_item_username()
+{
+    local item_key="$1"
+    get_op_item_field "$item_key" "designation" "username"
+}
+
+function get_op_item_password()
+{
+    local item_key="$1"
+    get_op_item_field "$item_key" "designation" "password"
+}
+
+if [[ $# -ne 1 ]]; then
+    usage
+fi
+item="$1"
+get_op_item_password "$item"
+exit 0
+
