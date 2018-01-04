@@ -30,6 +30,9 @@ _1PASS_VERBOSE=${_1PASS_VERSION:-false}
 _1PASS_INPUT=${_1PASS_INPUT:-gui}
 _1PASS_ASKPASS=${_1PASS_ASKPASS:-${SSH_ASKPASS:-ssh-askpass}}
 _1PASS_CONFIG=${_1PASS_CONFIG:-$HOME/.op/config}
+_1PASS_DOMAIN=${_1PASS_DOMAIN:-}
+_1PASS_EMAIL=${_1PASS_EMAIL:-}
+_1PASS_SECRET_KEY=${_1PASS_SECRET_KEY:-}
 _1PASS_MASTER_PASSWORD=${_1PASS_MASTER_PASSWORD:-}
 
 function usage()
@@ -174,6 +177,7 @@ function read_password()
 {
     local prompt="$1"
     local var="$2"
+    local default="$3"
     
     while true
     do
@@ -183,6 +187,12 @@ function read_password()
 	eval $var=\""$(read_password_$_1PASS_INPUT "$prompt")"\" read_password_status=\$?
 	if [[ $read_password_status -ne 0 ]]; then
 	    return 1
+	fi
+
+	# If no value provided and default, use that.
+	var_value="$(eval_variable $var)"
+	if [[ "$var_value" == "" && "$default" != "" ]]; then
+	    eval $var=\""$default"\"
 	fi
     done
     return 0
@@ -208,8 +218,37 @@ function op_config_value()
 
 function op_login_first_time()
 {
-    # TODO: Implement
-    exit 1
+    local default_domain="my.1password.com"
+    
+    if ! read_password "Domain (default: $default_domain)" _1PASS_DOMAIN $default_domain
+    then
+	verb "Login cancelled"
+	exit 1
+    fi
+
+    if ! read_password "E-mail" _1PASS_EMAIL
+    then
+	verb "Login cancelled"
+	exit 1
+    fi
+
+    if ! read_password "Secret Key" _1PASS_SECRET_KEY
+    then
+	verb "Login cancelled"
+	exit 1
+    fi
+
+    if ! read_password "Master password for $_1PASS_EMAIL" _1PASS_MASTER_PASSWORD
+    then
+	verb "Login cancelled"
+	exit 1
+    fi
+
+    eval $(echo "$_1PASS_MASTER_PASSWORD" | $_1PASS_OP signin "$_1PASS_DOMAIN" "$_1PASS_EMAIL" "$_1PASS_SECRET_KEY" 2>/dev/null)
+
+    # Unset provided environment variable, if incorrect will have to manually ask user.
+    # Also ensures this does not persist too long in memory.
+    unset _1PASS_DOMAIN _1PASS_EMAIL _1PASS_SECRET_KEY _1PASS_MASTER_PASSWORD
 }
 
 function op_login_existing()
@@ -241,6 +280,7 @@ function op_login()
 
 	if [[ "$user" == "" ]]; then
 	    op_login_first_time
+	    user="$(op_latest_signin)"
 	else
 	    op_login_existing $user
 	fi
