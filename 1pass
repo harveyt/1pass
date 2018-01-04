@@ -26,8 +26,9 @@
 #
 _1PASS_OP=${_1PASS_OP:-op}
 _1PASS_JQ=${_1PASS_JQ:-jq}
+_1PASS_VERBOSE=${_1PASS_VERSION:-false}
 _1PASS_INPUT=${_1PASS_INPUT:-gui}
-_1PASS_ASKPASS=${_1PASS_ASKPASS:-${SSH_ASKPASS:--}}
+_1PASS_ASKPASS=${_1PASS_ASKPASS:-${SSH_ASKPASS:-ssh-askpass}}
 _1PASS_CONFIG=${_1PASS_CONFIG:-$HOME/.op/config}
 _1PASS_MASTER_PASSWORD=${_1PASS_MASTER_PASSWORD:-}
 
@@ -41,7 +42,8 @@ Simple frontend 1Password information using 'op' 1Password CLI command.
 -u title		Print the username for the given entry with 'title'.
 -U title		Print the URL for the given entry with 'title'.
 -s regexp		Print any titles which match the case-insensitive extended RE 'regexp'.
--l			List all available titles.
+-l, --list		List all available titles.
+-v, --verbose		Verbose output to stderr.
 
 -t, --terminal		Force use of TTY terminal for any password input.
 -g, --gui		Force use of GUI for any password input.
@@ -62,6 +64,18 @@ function error()
 {
     echo "Error: 1pass: $*" >&2
     exit 1
+}
+
+function verb()
+{
+    [[ "$_1PASS_VERBOSE" != "true" ]] && return
+    echo "1pass: $*" >&2
+}
+
+function eval_variable()
+{
+    local var="$1"
+    eval echo \"\$"$var"\"
 }
 
 # --------------------------------------------------------------------------------
@@ -137,41 +151,47 @@ function search_op_items()
 # 1Password login/logout
 #
 
-function read_password_stdin
+
+function read_password_terminal()
 {
     local prompt="$1"
     local pass=""
-    while [[ "$pass" == "" ]]
-    do
-	if [[ "$TERM" == "dumb" ]]; then
-	    read -p "$prompt: " pass
-	else
-	    read -s -p "$prompt: " pass
-	    echo "" >&2
-	fi
-    done
+
+    if [[ "$TERM" == "dumb" ]]; then
+	read -p "$prompt: " pass
+    else
+	read -s -p "$prompt: " pass
+	echo "" >&2
+    fi
     echo "$pass"
 }
 
-function eval_variable()
+function read_password_gui()
 {
-    local var="$1"
-    eval echo \"\$"$var"\"
+    SSH_ASKPASS_TITLE="1Password" "$_1PASS_ASKPASS" "$prompt"
 }
 
 function read_password()
 {
     local prompt="$1"
     local var="$2"
-    local var_value="$(eval_variable $var)"
-    
-    [[ "$var_value" != "" ]] && return
 
-    local askpass="$_1PASS_ASKPASS"
-    [[ "$askpass" == "-" ]] && askpass=read_password_stdin
+    while true
+    do
+	local var_value="$(eval_variable $var)"
+	[[ "$var_value" != "" ]] && break
 
-    eval $var="$(SSH_ASKPASS_TITLE="1Password" $askpass "$prompt")"
-    # echo "$var=$(eval_variable $var)"
+	eval $var=\""$(read_password_$_1PASS_INPUT "$prompt")"\"
+    done
+    echo "export $var=\"$(eval_variable $var)\""
+}
+
+function op_latest_signin()
+{
+    if [[ ! -f $_1PASS_CONFIG ]]; then
+	return
+    fi
+    $_1PASS_JQ -r '.latest_signin' < $_1PASS_CONFIG
 }
 
 function op_config_value()
@@ -180,7 +200,7 @@ function op_config_value()
     if [[ ! -f $_1PASS_CONFIG ]]; then
 	error "no existing op configuration found in $_1PASS_CONFIG"
     fi
-    local latest_signin="$($_1PASS_JQ -r '.latest_signin' < $_1PASS_CONFIG)"
+    local latest_signin="$()"
     $_1PASS_JQ -r '.accounts[] | select(.shorthand == "'"$latest_signin"'").'"$field"'' < $_1PASS_CONFIG
 }
 
@@ -200,22 +220,45 @@ function op_login()
 
 function op_logout()
 {
-    # TODO
-    echo "Implement"
+    if $_1PASS_OP signout 2>/dev/null
+    then
+	verb "Session logged out."
+	local latest_signin="$(op_latest_signin)"
+	if [[ "$latest_signin" != "" ]]; then
+	    echo "unset OP_SESSION_${latest_signin}"
+	    verb "Session environment cleared."	    
+	fi
+    else
+	verb "Session already logged out."
+    fi
 }
 
 function op_login_valid()
 {
+    local latest_signin="$(op_latest_signin)"
+    if [[ "$latest_signin" == "" ]]; then
+	verb "No op config or latest signin, must not be logged in."
+	exit 1
+    fi
+
+    local session="$(eval_variable OP_SESSION_${latest_signin})"
+    if [[ "$session" == "" ]]; then
+	verb "No session key, must not be logged in."
+	exit 1
+    fi
+
     $_1PASS_OP list users >/dev/null 2>&1
     local op_status=$?
     if [[ $op_status -ne 0 ]]; then
+	verb "Session key timed out or invalid."
 	exit 1
     else
+	verb "Session key valid and logged in."
 	exit 0
     fi
 }
 
-short_opts="p:u:U:s:ltg"
+short_opts="p:u:U:s:lvtg"
 
 function process_opt()
 {
@@ -234,8 +277,11 @@ function process_opt()
 	s)
 	    search_op_items "$OPTARG"
 	    ;;
-	l)
+	l|list)
 	    list_op_items
+	    ;;
+	v|verbose)
+	    _1PASS_VERBOSE=true
 	    ;;
 	t|terminal)
 	    _1PASS_INPUT=terminal
