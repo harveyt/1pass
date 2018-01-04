@@ -151,7 +151,6 @@ function search_op_items()
 # 1Password login/logout
 #
 
-
 function read_password_terminal()
 {
     local prompt="$1"
@@ -175,7 +174,7 @@ function read_password()
 {
     local prompt="$1"
     local var="$2"
-
+    
     while true
     do
 	local var_value="$(eval_variable $var)"
@@ -207,36 +206,50 @@ function op_config_value()
     $_1PASS_JQ -r '.accounts[] | select(.shorthand == "'"$user"'").'"$field"'' <$_1PASS_CONFIG 2>/dev/null
 }
 
+function op_login_first_time()
+{
+    # TODO: Implement
+    exit 1
+}
+
+function op_login_existing()
+{
+    local user="$1"
+    local email="$(op_config_value $user email)"
+    local prompt="Master password for $email"
+
+    if ! read_password "$prompt" _1PASS_MASTER_PASSWORD
+    then
+	verb "Login cancelled"
+	exit 1
+    fi
+
+    eval $(echo "$_1PASS_MASTER_PASSWORD" | $_1PASS_OP signin $user 2>/dev/null)
+
+    # Unset provided environment variable, if incorrect will have to manually ask user.
+    # Also ensures this does not persist too long in memory.
+    unset _1PASS_MASTER_PASSWORD
+}
+
 function op_login()
 {
-    local latest_signin email prompt
+    local user
     
     while ! $(op_login_valid)
     do
-	# TODO: if no current op config or latest signin, ask for all information required for
-	# full login
+	user="$(op_latest_signin)"
 
-	latest_signin="$(op_latest_signin)"
-	email="$(op_config_value $latest_signin email)"
-	prompt="Master password for $email"
-
-	if ! read_password "$prompt" _1PASS_MASTER_PASSWORD
-	then
-	    verb "Login cancelled"
-	    exit 1
+	if [[ "$user" == "" ]]; then
+	    op_login_first_time
+	else
+	    op_login_existing $user
 	fi
-
-	eval $(echo "$_1PASS_MASTER_PASSWORD" | $_1PASS_OP signin $latest_signin 2>/dev/null)
-
-	# Unset provided environment variable, if incorrect will have to manually ask user.
-	# Also ensures this does not persist too long in memory.
-	unset _1PASS_MASTER_PASSWORD
     done
 
-    if [[ "$latest_signin" != "" ]]; then
+    if [[ "$user" != "" ]]; then
 	# Only non-empty if logged in for first time.
-	local session="$(eval_variable OP_SESSION_${latest_signin})"
-	echo "export OP_SESSION_${latest_signin}=$session"
+	local session="$(eval_variable OP_SESSION_${user})"
+	echo "export OP_SESSION_${user}=$session"
     fi
 }
 
@@ -248,11 +261,11 @@ function op_logout()
     else
 	verb "Session already logged out."
     fi
-    local latest_signin="$(op_latest_signin)"
-    if [[ "$latest_signin" != "" ]]; then
-	local session="$(eval_variable OP_SESSION_${latest_signin})"
+    local user="$(op_latest_signin)"
+    if [[ "$user" != "" ]]; then
+	local session="$(eval_variable OP_SESSION_${user})"
 	if [[ "$session" != "" ]]; then
-	    echo "unset OP_SESSION_${latest_signin}"
+	    echo "unset OP_SESSION_${user}"
 	    verb "Session environment cleared."
 	fi
     fi
@@ -260,13 +273,13 @@ function op_logout()
 
 function op_login_valid()
 {
-    local latest_signin="$(op_latest_signin)"
-    if [[ "$latest_signin" == "" ]]; then
+    local user="$(op_latest_signin)"
+    if [[ "$user" == "" ]]; then
 	verb "No op config or latest signin, must not be logged in."
 	exit 1
     fi
 
-    local session="$(eval_variable OP_SESSION_${latest_signin})"
+    local session="$(eval_variable OP_SESSION_${user})"
     if [[ "$session" == "" ]]; then
 	verb "No session key, must not be logged in."
 	exit 1
