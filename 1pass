@@ -191,7 +191,7 @@ function op_latest_signin()
     if [[ ! -f $_1PASS_CONFIG ]]; then
 	return
     fi
-    $_1PASS_JQ -r '.latest_signin' < $_1PASS_CONFIG
+    $_1PASS_JQ -r '.latest_signin' <$_1PASS_CONFIG 2>/dev/null
 }
 
 function op_config_value()
@@ -223,13 +223,16 @@ function op_logout()
     if $_1PASS_OP signout 2>/dev/null
     then
 	verb "Session logged out."
-	local latest_signin="$(op_latest_signin)"
-	if [[ "$latest_signin" != "" ]]; then
-	    echo "unset OP_SESSION_${latest_signin}"
-	    verb "Session environment cleared."	    
-	fi
     else
 	verb "Session already logged out."
+    fi
+    local latest_signin="$(op_latest_signin)"
+    if [[ "$latest_signin" != "" ]]; then
+	local session="$(eval_variable OP_SESSION_${latest_signin})"
+	if [[ "$session" != "" ]]; then
+	    echo "unset OP_SESSION_${latest_signin}"
+	    verb "Session environment cleared."
+	fi
     fi
 }
 
