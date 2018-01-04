@@ -5,9 +5,14 @@
 
 function usage()
 {
-    echo "usage: 1pass item
+    echo "usage: 1pass ...
 
-Return the password for the given 1Password item.
+Simple frontend 1Password information using 'op' 1Password CLI command.
+
+-p title		Print the password for the given entry with 'title'.
+-u title		Print the username for the given entry with 'title'.
+-s regexp		Print any titles which match the case-insensitive extended RE 'regexp'.
+-l			List all available titles.
 " >&2
     exit 1
 }
@@ -25,9 +30,10 @@ function op_validate_query()
 function get_op_item_field()
 {
     local item_key="$1"
-    local item_field_type="$2"
-    local item_field="$3"
-    local op_value="$(op get item "$item_key" 2>/dev/null | jq -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value')"
+    local item_selection="$2"
+    local item_field_type="$3"
+    local item_field="$4"
+    local op_value="$(op get item "$item_key" 2>/dev/null | jq -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -35,19 +41,53 @@ function get_op_item_field()
 function get_op_item_username()
 {
     local item_key="$1"
-    get_op_item_field "$item_key" "designation" "username"
+    get_op_item_field "$item_key" ".details.fields[]" "designation" "username"
 }
 
 function get_op_item_password()
 {
     local item_key="$1"
-    get_op_item_field "$item_key" "designation" "password"
+    get_op_item_field "$item_key" ".details.fields[]" "designation" "password"
 }
 
-if [[ $# -ne 1 ]]; then
+function list_op_items()
+{
+    op list items | jq -r '.[] | select(.templateUuid == "001").overview.title' | sort
+    local op_status=$?
+    if [[ $opt_status -ne 0 ]]; then
+	echo "Cannot get list of 1Password items" >&2
+	exit 1
+    fi
+}
+
+function search_op_items()
+{
+    local search="$1"
+    list_op_items | egrep -i "$search"
+}
+
+while getopts p:u:s:l c
+do
+    case $c in
+	p)
+	    get_op_item_password "$OPTARG"
+	    ;;
+	u)
+	    get_op_item_username "$OPTARG"
+	    ;;
+	s)
+	    search_op_items "$OPTARG"
+	    ;;
+	l)
+	    list_op_items
+	    ;;
+	*)
+	    usage
+	    ;;
+    esac
+done
+shift $((OPTIND - 1))
+if [[ $# -ne 0 ]]; then
     usage
 fi
-item="$1"
-get_op_item_password "$item"
 exit 0
-
