@@ -4,6 +4,7 @@
 #
 _1PASS_OP=${_1PASS_OP:-op}
 _1PASS_JQ=${_1PASS_JQ:-jq}
+_1PASS_INPUT=${_1PASS_INPUT:-gui}
 _1PASS_ASKPASS=${_1PASS_ASKPASS:-${SSH_ASKPASS:--}}
 _1PASS_CONFIG=${_1PASS_CONFIG:-$HOME/.op/config}
 _1PASS_MASTER_PASSWORD=${_1PASS_MASTER_PASSWORD:-}
@@ -19,6 +20,9 @@ Simple frontend 1Password information using 'op' 1Password CLI command.
 -U title		Print the URL for the given entry with 'title'.
 -s regexp		Print any titles which match the case-insensitive extended RE 'regexp'.
 -l			List all available titles.
+
+-t, --terminal		Force use of TTY terminal for any password input.
+-g, --gui		Force use of GUI for any password input.
 
 --login			Ensure session is logged in. Must evaluate in shell (eg. 'eval $(1pass --login)')
 --logout		Ensure session is logged out. Must evaluate in shell (eg. 'eval $(1pass --logout)')
@@ -189,11 +193,13 @@ function op_login_valid()
     fi
 }
 
-# --------------------------------------------------------------------------------
-# Main
-while getopts p:u:U:s:l-: c
-do
-    case "$c" in
+short_opts="p:u:U:s:ltg"
+
+function process_opt()
+{
+    local opt="$1"
+
+    case "$opt" in
 	p)
 	    get_op_item_password "$OPTARG"
 	    ;;
@@ -209,24 +215,40 @@ do
 	l)
 	    list_op_items
 	    ;;
-	-)
-	    case "$OPTARG" in
-		login)
-		    op_login
-		    ;;
-		logout)
-		    op_logout
-		    ;;
-		login-valid)
-		    op_login_valid
-		    ;;
-		*)
-		    usage
-		    ;;
-	    esac
+	t|terminal)
+	    _1PASS_INPUT=terminal
+	    ;;
+	g|gui)
+	    _1PASS_INPUT=gui
+	    ;;
+	login)
+	    op_login
+	    ;;
+	logout)
+	    op_logout
+	    ;;
+	login-valid)
+	    op_login_valid
 	    ;;
 	*)
 	    usage
+	    ;;
+    esac
+}
+
+# --------------------------------------------------------------------------------
+# Main
+
+while getopts "${short_opts}-:" c
+do
+    case "$c" in
+	-)
+	    local long_opt="$OPTARG"
+	    OPTARG=""
+	    process_opt "$long_opt"
+	    ;;
+	*)
+	    process_opt "$c"
 	    ;;
     esac
 done
@@ -235,3 +257,4 @@ if [[ $# -ne 0 ]]; then
     usage
 fi
 exit 0
+
