@@ -243,7 +243,7 @@ while getopts "${short_opts}-:" c
 do
     case "$c" in
 	-)
-	    local long_opt="$OPTARG"
+	    long_opt="$OPTARG"
 	    OPTARG=""
 	    process_opt "$long_opt"
 	    ;;
