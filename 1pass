@@ -2,8 +2,11 @@
 #
 # 1Password helper.
 #
-PATH_OP=op
-PATH_JQ=jq
+_1PASS_OP=${_1PASS_OP:-op}
+_1PASS_JQ=${_1PASS_JQ:-jq}
+_1PASS_ASKPASS=${_1PASS_ASKPASS:-${SSH_ASKPASS:--}}
+_1PASS_CONFIG=${_1PASS_CONFIG:-$HOME/.op/config}
+_1PASS_MASTER_PASSWORD=${_1PASS_MASTER_PASSWORD:-}
 
 function usage()
 {
@@ -16,16 +19,34 @@ Simple frontend 1Password information using 'op' 1Password CLI command.
 -U title		Print the URL for the given entry with 'title'.
 -s regexp		Print any titles which match the case-insensitive extended RE 'regexp'.
 -l			List all available titles.
+
+--login			Ensure session is logged in. Must evaluate in shell (eg. 'eval $(1pass --login)')
+--logout		Ensure session is logged out. Must evaluate in shell (eg. 'eval $(1pass --logout)')
+--login-valid		Exit status 0 if session is valid, or non-zero if not.
+
 " >&2
     exit 1
 }
+
+# --------------------------------------------------------------------------------
+# Helpers
+#
+
+function error()
+{
+    echo "Error: 1pass: $*" >&2
+    exit 1
+}
+
+# --------------------------------------------------------------------------------
+# 1Password query
+#
 
 function op_validate_query()
 {
     local op_key="$1" op_field="$2" op_status="$3" op_value="$4"
     if [[ "$op_value" == "" || $op_status -ne 0 ]]; then
-	echo "Cannot get $op_field for $op_key" >&2
-	exit 1
+	error "cannot get $op_field for $op_key"
     fi
     echo "$op_value"
 }
@@ -35,7 +56,7 @@ function get_op_item_field()
     local item_key="$1"
     local item_field_type="$2"
     local item_field="$3"
-    local op_value="$($PATH_OP get item "$item_key" 2>/dev/null | $PATH_JQ -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
+    local op_value="$($_1PASS_OP get item "$item_key" 2>/dev/null | $_1PASS_JQ -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -44,7 +65,7 @@ function get_op_item_overview()
 {
     local item_key="$1"
     local item_field="$2"
-    local op_value="$($PATH_OP get item "$item_key" 2>/dev/null | $PATH_JQ -r '.overview.'"$item_field" 2>/dev/null)"
+    local op_value="$($_1PASS_OP get item "$item_key" 2>/dev/null | $_1PASS_JQ -r '.overview.'"$item_field" 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -69,11 +90,10 @@ function get_op_item_url()
 
 function list_op_items()
 {
-    $PATH_OP list items 2>/dev/null | $PATH_JQ -r '.[] | select(.templateUuid == "001").overview.title' | sort
+    $_1PASS_OP list items 2>/dev/null | $_1PASS_JQ -r '.[] | select(.templateUuid == "001").overview.title' | sort
     local op_status=${PIPESTATUS[0]}
     if [[ $op_status -ne 0 ]]; then
-	echo "Cannot get list of 1Password items" >&2
-	exit 1
+	error "cannot get list of 1Password items"
     fi
 }
 
@@ -87,9 +107,93 @@ function search_op_items()
     fi
 }
 
-while getopts p:u:U:s:l c
+# --------------------------------------------------------------------------------
+# 1Password login/logout
+#
+
+function read_password_stdin
+{
+    local prompt="$1"
+    local pass=""
+    while [[ "$pass" == "" ]]
+    do
+	if [[ "$TERM" == "dumb" ]]; then
+	    read -p "$prompt: " pass
+	else
+	    read -s -p "$prompt: " pass
+	    echo "" >&2
+	fi
+    done
+    echo "$pass"
+}
+
+function eval_variable()
+{
+    local var="$1"
+    eval echo \"\$"$var"\"
+}
+
+function read_password()
+{
+    local prompt="$1"
+    local var="$2"
+    local var_value="$(eval_variable $var)"
+    
+    [[ "$var_value" != "" ]] && return
+
+    local askpass="$_1PASS_ASKPASS"
+    [[ "$askpass" == "-" ]] && askpass=read_password_stdin
+
+    eval $var="$(SSH_ASKPASS_TITLE="1Password" $askpass "$prompt")"
+    # echo "$var=$(eval_variable $var)"
+}
+
+function op_config_value()
+{
+    local field="$1"
+    if [[ ! -f $_1PASS_CONFIG ]]; then
+	error "no existing op configuration found in $_1PASS_CONFIG"
+    fi
+    local latest_signin="$($_1PASS_JQ -r '.latest_signin' < $_1PASS_CONFIG)"
+    $_1PASS_JQ -r '.accounts[] | select(.shorthand == "'"$latest_signin"'").'"$field"'' < $_1PASS_CONFIG
+}
+
+function op_login()
+{
+    # TODO: if no current op config or latest signin, ask for all information required for full login
+    
+    local email="$(op_config_value email)"
+    local prompt="Master password for $email"
+
+    read_password "$prompt" _1PASS_MASTER_PASSWORD
+
+    # TODO: try to sign in
+    # check if signed in
+    # repeat until succesful...
+}
+
+function op_logout()
+{
+    # TODO
+    echo "Implement"
+}
+
+function op_login_valid()
+{
+    $_1PASS_OP list users >/dev/null 2>&1
+    local op_status=$?
+    if [[ $op_status -ne 0 ]]; then
+	exit 1
+    else
+	exit 0
+    fi
+}
+
+# --------------------------------------------------------------------------------
+# Main
+while getopts p:u:U:s:l-: c
 do
-    case $c in
+    case "$c" in
 	p)
 	    get_op_item_password "$OPTARG"
 	    ;;
@@ -104,6 +208,22 @@ do
 	    ;;
 	l)
 	    list_op_items
+	    ;;
+	-)
+	    case "$OPTARG" in
+		login)
+		    op_login
+		    ;;
+		logout)
+		    op_logout
+		    ;;
+		login-valid)
+		    op_login_valid
+		    ;;
+		*)
+		    usage
+		    ;;
+	    esac
 	    ;;
 	*)
 	    usage
