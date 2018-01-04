@@ -2,6 +2,8 @@
 #
 # 1Password helper.
 #
+PATH_OP=op
+PATH_JQ=jq
 
 function usage()
 {
@@ -33,7 +35,7 @@ function get_op_item_field()
     local item_key="$1"
     local item_field_type="$2"
     local item_field="$3"
-    local op_value="$(op get item "$item_key" 2>/dev/null | jq -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
+    local op_value="$($PATH_OP get item "$item_key" 2>/dev/null | $PATH_JQ -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -42,7 +44,7 @@ function get_op_item_overview()
 {
     local item_key="$1"
     local item_field="$2"
-    local op_value="$(op get item "$item_key" 2>/dev/null | jq -r '.overview.'"$item_field" 2>/dev/null)"
+    local op_value="$($PATH_OP get item "$item_key" 2>/dev/null | $PATH_JQ -r '.overview.'"$item_field" 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -67,7 +69,7 @@ function get_op_item_url()
 
 function list_op_items()
 {
-    op list items 2>/dev/null | jq -r '.[] | select(.templateUuid == "001").overview.title' | sort
+    $PATH_OP list items 2>/dev/null | $PATH_JQ -r '.[] | select(.templateUuid == "001").overview.title' | sort
     local op_status=${PIPESTATUS[0]}
     if [[ $op_status -ne 0 ]]; then
 	echo "Cannot get list of 1Password items" >&2
