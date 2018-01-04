@@ -7,9 +7,8 @@ Yet another simple non-caching wrapper around the
 Warning
 =======
 
-There is no waranty with this code, you should inspect the code carefully to make sure I've not made
-any mistakes or introduced security holes. You should definitely assume not to trust me or my
-coding.
+There is no waranty with this code, you should inspect the code carefully to make sure the
+contributors have not made any mistakes or introduced security holes.
 
 For more details see the [License](LICENSE).
 
@@ -35,7 +34,8 @@ Features
   $ 1pass -U MyWebsite
   https://www.mywebsite.local/login
   ```
-* All searches and passwords, usernames and URLs are shown only to stdout.
+* All session changes, searches for passwords, usernames and URLs are shown only to stdout.
+* All password prompts and verbose output are shown only to stderr.
 * Allows improved login and logout session control, showing export commands for shell scripting.
   ```
   $ 1pass --terminal --login
