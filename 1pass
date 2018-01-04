@@ -168,7 +168,7 @@ function read_password_terminal()
 
 function read_password_gui()
 {
-    SSH_ASKPASS_TITLE="1Password" "$_1PASS_ASKPASS" "$prompt"
+    SSH_ASKPASS_TITLE="1Password" "$_1PASS_ASKPASS" "$prompt" 2>/dev/null
 }
 
 function read_password()
@@ -181,9 +181,12 @@ function read_password()
 	local var_value="$(eval_variable $var)"
 	[[ "$var_value" != "" ]] && break
 
-	eval $var=\""$(read_password_$_1PASS_INPUT "$prompt")"\"
+	eval $var=\""$(read_password_$_1PASS_INPUT "$prompt")"\" read_password_status=\$?
+	if [[ $read_password_status -ne 0 ]]; then
+	    return 1
+	fi
     done
-    echo "export $var=\"$(eval_variable $var)\""
+    return 0
 }
 
 function op_latest_signin()
@@ -196,26 +199,45 @@ function op_latest_signin()
 
 function op_config_value()
 {
-    local field="$1"
+    local user="$1" field="$2"
+
     if [[ ! -f $_1PASS_CONFIG ]]; then
-	error "no existing op configuration found in $_1PASS_CONFIG"
+	return
     fi
-    local latest_signin="$()"
-    $_1PASS_JQ -r '.accounts[] | select(.shorthand == "'"$latest_signin"'").'"$field"'' < $_1PASS_CONFIG
+    $_1PASS_JQ -r '.accounts[] | select(.shorthand == "'"$user"'").'"$field"'' <$_1PASS_CONFIG 2>/dev/null
 }
 
 function op_login()
 {
-    # TODO: if no current op config or latest signin, ask for all information required for full login
+    local latest_signin email prompt
     
-    local email="$(op_config_value email)"
-    local prompt="Master password for $email"
+    while ! $(op_login_valid)
+    do
+	# TODO: if no current op config or latest signin, ask for all information required for
+	# full login
 
-    read_password "$prompt" _1PASS_MASTER_PASSWORD
+	latest_signin="$(op_latest_signin)"
+	email="$(op_config_value $latest_signin email)"
+	prompt="Master password for $email"
 
-    # TODO: try to sign in
-    # check if signed in
-    # repeat until succesful...
+	if ! read_password "$prompt" _1PASS_MASTER_PASSWORD
+	then
+	    verb "Login cancelled"
+	    exit 1
+	fi
+
+	eval $(echo "$_1PASS_MASTER_PASSWORD" | $_1PASS_OP signin $latest_signin 2>/dev/null)
+
+	# Unset provided environment variable, if incorrect will have to manually ask user.
+	# Also ensures this does not persist too long in memory.
+	unset _1PASS_MASTER_PASSWORD
+    done
+
+    if [[ "$latest_signin" != "" ]]; then
+	# Only non-empty if logged in for first time.
+	local session="$(eval_variable OP_SESSION_${latest_signin})"
+	echo "export OP_SESSION_${latest_signin}=$session"
+    fi
 }
 
 function op_logout()
