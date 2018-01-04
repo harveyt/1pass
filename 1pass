@@ -38,20 +38,20 @@ function usage()
 
 Simple frontend 1Password information using 'op' 1Password CLI command.
 
--p title		Print the password for the given entry with 'title'.
--u title		Print the username for the given entry with 'title'.
--U title		Print the URL for the given entry with 'title'.
--s regexp		Print any titles which match the case-insensitive extended RE 'regexp'.
--l, --list		List all available titles.
--v, --verbose		Verbose output to stderr.
+-p title	Print the password for the given entry with 'title'.
+-u title	Print the username for the given entry with 'title'.
+-U title	Print the URL for the given entry with 'title'.
+-s regexp	Print any titles which match the case-insensitive extended RE 'regexp'.
+-l, --list	List all available titles.
 
--t, --terminal		Force use of TTY terminal for any password input.
--g, --gui		Force use of GUI for any password input.
+-v, --verbose	Verbose output to stderr.
 
---login			Ensure session is logged in. Must evaluate in shell (eg. 'eval $(1pass --login)')
---logout		Ensure session is logged out. Must evaluate in shell (eg. 'eval $(1pass --logout)')
---login-valid		Exit status 0 if session is valid, or non-zero if not.
+-t, --terminal	Force use of TTY terminal for any password input.
+-g, --gui	Force use of GUI for any password input.
 
+--login		Ensure session is logged in. Must evaluate in shell (eg. 'eval \$(1pass --login)')
+--logout	Ensure session is logged out. Must evaluate in shell (eg. 'eval \$(1pass --logout)')
+--login-valid	Exit status 0 if session is valid, or non-zero if not.
 " >&2
     exit 1
 }
