@@ -2,27 +2,9 @@
 #
 # 1Password CLI command helper.
 #
-# MIT License
+# Version: %%VERSION%%
 #
-# Copyright (c) 2018 Harvey Thompson
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-# 
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-# 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+# %%LICENSE%%
 #
 _1PASS_OP=${_1PASS_OP:-op}
 _1PASS_JQ=${_1PASS_JQ:-jq}
@@ -48,6 +30,7 @@ Simple frontend 1Password information using 'op' 1Password CLI command.
 -l, --list	List all available titles.
 
 -v, --verbose	Verbose output to stderr.
+-V, --version	Show version to stderr.
 
 -t, --terminal	Force use of TTY terminal for any password input.
 -g, --gui	Force use of GUI for any password input.
@@ -57,6 +40,12 @@ Simple frontend 1Password information using 'op' 1Password CLI command.
 --login-valid	Exit status 0 if session is valid, or non-zero if not.
 " >&2
     exit 1
+}
+
+function show_version()
+{
+    echo "1pass %%VERSION%%" >&2
+    exit 0
 }
 
 # --------------------------------------------------------------------------------
@@ -336,7 +325,7 @@ function op_login_valid()
     fi
 }
 
-short_opts="p:u:U:s:lvtg"
+short_opts="p:u:U:s:lvVtg"
 
 function process_opt()
 {
@@ -360,6 +349,9 @@ function process_opt()
 	    ;;
 	v|verbose)
 	    _1PASS_VERBOSE=true
+	    ;;
+	V|version)
+	    show_version
 	    ;;
 	t|terminal)
 	    _1PASS_INPUT=terminal
