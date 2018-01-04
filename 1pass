@@ -11,6 +11,7 @@ Simple frontend 1Password information using 'op' 1Password CLI command.
 
 -p title		Print the password for the given entry with 'title'.
 -u title		Print the username for the given entry with 'title'.
+-U title		Print the URL for the given entry with 'title'.
 -s regexp		Print any titles which match the case-insensitive extended RE 'regexp'.
 -l			List all available titles.
 " >&2
@@ -30,10 +31,18 @@ function op_validate_query()
 function get_op_item_field()
 {
     local item_key="$1"
-    local item_selection="$2"
-    local item_field_type="$3"
-    local item_field="$4"
+    local item_field_type="$2"
+    local item_field="$3"
     local op_value="$(op get item "$item_key" 2>/dev/null | jq -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
+    local op_status=${PIPESTATUS[0]}
+    op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
+}
+
+function get_op_item_overview()
+{
+    local item_key="$1"
+    local item_field="$2"
+    local op_value="$(op get item "$item_key" 2>/dev/null | jq -r '.overview.'"$item_field" 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -41,20 +50,26 @@ function get_op_item_field()
 function get_op_item_username()
 {
     local item_key="$1"
-    get_op_item_field "$item_key" ".details.fields[]" "designation" "username"
+    get_op_item_field "$item_key" "designation" "username"
 }
 
 function get_op_item_password()
 {
     local item_key="$1"
-    get_op_item_field "$item_key" ".details.fields[]" "designation" "password"
+    get_op_item_field "$item_key" "designation" "password"
+}
+
+function get_op_item_url()
+{
+    local item_key="$1"
+    get_op_item_overview "$item_key" "url"
 }
 
 function list_op_items()
 {
-    op list items | jq -r '.[] | select(.templateUuid == "001").overview.title' | sort
-    local op_status=$?
-    if [[ $opt_status -ne 0 ]]; then
+    op list items 2>/dev/null | jq -r '.[] | select(.templateUuid == "001").overview.title' | sort
+    local op_status=${PIPESTATUS[0]}
+    if [[ $op_status -ne 0 ]]; then
 	echo "Cannot get list of 1Password items" >&2
 	exit 1
     fi
@@ -64,9 +79,13 @@ function search_op_items()
 {
     local search="$1"
     list_op_items | egrep -i "$search"
+    local op_status=${PIPESTATUS[0]}
+    if [[ $op_status -ne 0 ]]; then
+	exit $op_status
+    fi
 }
 
-while getopts p:u:s:l c
+while getopts p:u:U:s:l c
 do
     case $c in
 	p)
@@ -74,6 +93,9 @@ do
 	    ;;
 	u)
 	    get_op_item_username "$OPTARG"
+	    ;;
+	U)
+	    get_op_item_url "$OPTARG"
 	    ;;
 	s)
 	    search_op_items "$OPTARG"
