@@ -88,7 +88,7 @@ function get_op_item_field()
     local item_key="$1"
     local item_field_type="$2"
     local item_field="$3"
-    local op_value="$($_1PASS_OP get item "$item_key" 2>/dev/null | $_1PASS_JQ -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
+    local op_value="$("$_1PASS_OP" get item "$item_key" 2>/dev/null | "$_1PASS_JQ" -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -97,7 +97,7 @@ function get_op_item_overview()
 {
     local item_key="$1"
     local item_field="$2"
-    local op_value="$($_1PASS_OP get item "$item_key" 2>/dev/null | $_1PASS_JQ -r '.overview.'"$item_field" 2>/dev/null)"
+    local op_value="$("$_1PASS_OP" get item "$item_key" 2>/dev/null | "$_1PASS_JQ" -r '.overview.'"$item_field" 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -122,7 +122,7 @@ function get_op_item_url()
 
 function list_op_items()
 {
-    $_1PASS_OP list items 2>/dev/null | $_1PASS_JQ -r '.[] | select(.templateUuid == "001").overview.title' | sort
+    "$_1PASS_OP" list items 2>/dev/null | "$_1PASS_JQ" -r '.[] | select(.templateUuid == "001").overview.title' | sort
     local op_status=${PIPESTATUS[0]}
     if [[ $op_status -ne 0 ]]; then
 	error "cannot get list of 1Password items"
@@ -189,20 +189,20 @@ function read_password()
 
 function op_latest_signin()
 {
-    if [[ ! -f $_1PASS_CONFIG ]]; then
+    if [[ ! -f "$_1PASS_CONFIG" ]]; then
 	return
     fi
-    $_1PASS_JQ -r '.latest_signin' <$_1PASS_CONFIG 2>/dev/null
+    "$_1PASS_JQ" -r '.latest_signin' <"$_1PASS_CONFIG" 2>/dev/null
 }
 
 function op_config_value()
 {
     local user="$1" field="$2"
 
-    if [[ ! -f $_1PASS_CONFIG ]]; then
+    if [[ ! -f "$_1PASS_CONFIG" ]]; then
 	return
     fi
-    $_1PASS_JQ -r '.accounts[] | select(.shorthand == "'"$user"'").'"$field"'' <$_1PASS_CONFIG 2>/dev/null
+    "$_1PASS_JQ" -r '.accounts[] | select(.shorthand == "'"$user"'").'"$field"'' <"$_1PASS_CONFIG" 2>/dev/null
 }
 
 function op_login_first_time()
@@ -233,7 +233,7 @@ function op_login_first_time()
 	exit 1
     fi
 
-    eval $(echo "$_1PASS_MASTER_PASSWORD" | $_1PASS_OP signin "$_1PASS_DOMAIN" "$_1PASS_EMAIL" "$_1PASS_SECRET_KEY" 2>/dev/null)
+    eval $(echo "$_1PASS_MASTER_PASSWORD" | "$_1PASS_OP" signin "$_1PASS_DOMAIN" "$_1PASS_EMAIL" "$_1PASS_SECRET_KEY" 2>/dev/null)
 
     # Unset provided environment variable, if incorrect will have to manually ask user.
     # Also ensures this does not persist too long in memory.
@@ -252,7 +252,7 @@ function op_login_existing()
 	exit 1
     fi
 
-    eval $(echo "$_1PASS_MASTER_PASSWORD" | $_1PASS_OP signin $user 2>/dev/null)
+    eval $(echo "$_1PASS_MASTER_PASSWORD" | "$_1PASS_OP" signin $user 2>/dev/null)
 
     # Unset provided environment variable, if incorrect will have to manually ask user.
     # Also ensures this does not persist too long in memory.
@@ -284,7 +284,7 @@ function op_login()
 
 function op_logout()
 {
-    if $_1PASS_OP signout 2>/dev/null
+    if "$_1PASS_OP" signout 2>/dev/null
     then
 	verb "Session logged out."
     else
@@ -314,7 +314,7 @@ function op_login_valid()
 	exit 1
     fi
 
-    $_1PASS_OP list users >/dev/null 2>&1
+    "$_1PASS_OP" list users >/dev/null 2>&1
     local op_status=$?
     if [[ $op_status -ne 0 ]]; then
 	verb "Session key timed out or invalid."
