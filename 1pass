@@ -23,21 +23,30 @@ function usage()
 
 Simple frontend 1Password information using 'op' 1Password CLI command.
 
--p title	Print the password for the given entry with 'title'.
--u title	Print the username for the given entry with 'title'.
--U title	Print the URL for the given entry with 'title'.
--s regexp	Print any titles which match the case-insensitive extended RE 'regexp'.
--l, --list	List all available titles.
+-p title		Print the password for the given entry with 'title'.
+-u title		Print the username for the given entry with 'title'.
+-U title		Print the URL for the given entry with 'title'.
+-s regexp		Print any titles which match the case-insensitive extended RE 'regexp'.
+-l, --list		List all available titles.
 
--v, --verbose	Verbose output to stderr.
--V, --version	Show version to stderr.
+-v, --verbose		Verbose output to stderr.
+-V, --version		Print version to stderr.
 
--t, --terminal	Force use of TTY terminal for any password input.
--g, --gui	Force use of GUI for any password input.
+-t, --terminal		Force use of TTY terminal for any password input.
+-g, --gui		Force use of GUI for any password input.
 
---login		Ensure session is logged in. Must evaluate in shell (eg. 'eval \$(1pass --login)')
---logout	Ensure session is logged out. Must evaluate in shell (eg. 'eval \$(1pass --logout)')
---login-valid	Exit status 0 if session is valid, or non-zero if not.
+--login			Ensure session is logged in.
+			Must evaluate in shell (eg. 'eval \$(1pass --login)')
+--logout		Ensure session is logged out.
+			Must evaluate in shell (eg. 'eval \$(1pass --logout)')
+--login-valid		Exit status 0 if session is valid, or non-zero if not.
+
+--latest-signin		Print the short-hand for the latest signed in account.
+--domain		Print the latest signed in account's domain.
+--email			Print the latest signed in account's email.
+--secret-key		Print the latest signed in account's secret.
+--account-name		Print the latest signed in account name which contains master password.
+--master-password	Print the latest signed in account's master.
 " >&2
     exit 1
 }
@@ -137,6 +146,15 @@ function search_op_items()
     if [[ $op_status -ne 0 ]]; then
 	exit $op_status
     fi
+}
+
+function get_op_user_field()
+{
+    local user_key="$1"
+    local user_field="$2"
+    local op_value="$("$_1PASS_OP" get user "$user_key" 2>/dev/null | "$_1PASS_JQ" -r '.'"$user_field" 2>/dev/null)"
+    local op_status=${PIPESTATUS[0]}
+    op_validate_query "$user_key" "$user_field" "$op_status" "$op_value"
 }
 
 # --------------------------------------------------------------------------------
@@ -325,6 +343,48 @@ function op_login_valid()
     fi
 }
 
+function op_domain()
+{
+    local user="$(op_latest_signin)"
+    local url="$(op_config_value $user url)"
+
+    echo ${url#https://}
+}
+
+function op_email()
+{
+    local user="$(op_latest_signin)"
+    op_config_value $user email
+}
+
+function op_secret_key()
+{
+    local user="$(op_latest_signin)"
+    op_config_value $user accountKey
+}
+
+function op_account_name()
+{
+    local user="$(op_latest_signin)"
+    local userUUID="$(op_config_value $user userUUID)"
+    local first_name="$(get_op_user_field "$userUUID" firstName)"
+    local last_name="$(get_op_user_field "$userUUID" lastName)"
+
+    if [[ "$first_name" == "" || "$last_name" == "" ]]; then
+	error "cannot get account name"
+    fi
+    
+    echo "1Password Account ($first_name $last_name)"
+}
+
+function op_master_password()
+{
+    local account_name="$(op_account_name)"
+
+    get_op_item_password "$account_name"
+}
+
+# --------------------------------------------------------------------------------
 short_opts="p:u:U:s:lvVtg"
 
 function process_opt()
@@ -367,6 +427,24 @@ function process_opt()
 	    ;;
 	login-valid)
 	    op_login_valid
+	    ;;
+	latest-signin)
+	    op_latest_signin
+	    ;;
+	domain)
+	    op_domain
+	    ;;
+	email)
+	    op_email
+	    ;;
+	secret-key)
+	    op_secret_key
+	    ;;
+	account-name)
+	    op_account_name
+	    ;;
+	master-password)
+	    op_master_password
 	    ;;
 	*)
 	    usage
