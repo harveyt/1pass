@@ -82,6 +82,17 @@ function eval_variable()
 # --------------------------------------------------------------------------------
 # 1Password query
 #
+function run_op()
+{
+    "$_1PASS_OP" "$@" </dev/null 2>/dev/null
+}
+
+function run_op_with_input()
+{
+    local input="$1"
+    shift
+    echo "$input" | "$_1PASS_OP" "$@" 2>/dev/null
+}
 
 function op_validate_query()
 {
@@ -97,7 +108,7 @@ function get_op_item_field()
     local item_key="$1"
     local item_field_type="$2"
     local item_field="$3"
-    local op_value="$("$_1PASS_OP" get item "$item_key" 2>/dev/null | "$_1PASS_JQ" -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
+    local op_value="$(run_op get item "$item_key" | "$_1PASS_JQ" -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -106,7 +117,7 @@ function get_op_item_overview()
 {
     local item_key="$1"
     local item_field="$2"
-    local op_value="$("$_1PASS_OP" get item "$item_key" 2>/dev/null | "$_1PASS_JQ" -r '.overview.'"$item_field" 2>/dev/null)"
+    local op_value="$(run_op get item "$item_key" | "$_1PASS_JQ" -r '.overview.'"$item_field" 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -131,7 +142,7 @@ function get_op_item_url()
 
 function list_op_items()
 {
-    "$_1PASS_OP" list items 2>/dev/null | "$_1PASS_JQ" -r '.[] | select(.templateUuid == "001").overview.title' | sort
+    run_op list items | "$_1PASS_JQ" -r '.[] | select(.templateUuid == "001").overview.title' | sort
     local op_status=${PIPESTATUS[0]}
     if [[ $op_status -ne 0 ]]; then
 	error "cannot get list of 1Password items"
@@ -152,7 +163,7 @@ function get_op_user_field()
 {
     local user_key="$1"
     local user_field="$2"
-    local op_value="$("$_1PASS_OP" get user "$user_key" 2>/dev/null | "$_1PASS_JQ" -r '.'"$user_field" 2>/dev/null)"
+    local op_value="$(run_op get user "$user_key" | "$_1PASS_JQ" -r '.'"$user_field" 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$user_key" "$user_field" "$op_status" "$op_value"
 }
@@ -251,7 +262,7 @@ function op_login_first_time()
 	exit 1
     fi
 
-    eval $(echo "$_1PASS_MASTER_PASSWORD" | "$_1PASS_OP" signin "$_1PASS_DOMAIN" "$_1PASS_EMAIL" "$_1PASS_SECRET_KEY" 2>/dev/null)
+    eval $(run_op_with_input "$_1PASS_MASTER_PASSWORD" signin "$_1PASS_DOMAIN" "$_1PASS_EMAIL" "$_1PASS_SECRET_KEY")
 
     # Unset provided environment variable, if incorrect will have to manually ask user.
     # Also ensures this does not persist too long in memory.
@@ -270,7 +281,7 @@ function op_login_existing()
 	exit 1
     fi
 
-    eval $(echo "$_1PASS_MASTER_PASSWORD" | "$_1PASS_OP" signin $user 2>/dev/null)
+    eval $(run_op_with_input "$_1PASS_MASTER_PASSWORD" signin $user)
 
     # Unset provided environment variable, if incorrect will have to manually ask user.
     # Also ensures this does not persist too long in memory.
@@ -302,7 +313,7 @@ function op_login()
 
 function op_logout()
 {
-    if "$_1PASS_OP" signout 2>/dev/null
+    if run_op signout
     then
 	verb "Session logged out."
     else
@@ -332,7 +343,7 @@ function op_login_valid()
 	exit 1
     fi
 
-    "$_1PASS_OP" list users >/dev/null 2>&1
+    run_op list users >/dev/null
     local op_status=$?
     if [[ $op_status -ne 0 ]]; then
 	verb "Session key timed out or invalid."
