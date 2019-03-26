@@ -82,16 +82,29 @@ function eval_variable()
 # --------------------------------------------------------------------------------
 # 1Password query
 #
+function run_op_cmd()
+{
+    case $(uname -s) in
+	CYGWIN_NT-10.0)
+	    local session_vars="$(env | sed -n -e 's/^\(OP_SESSION[^=]*\)=\(.*\)/\1=\"\2\"/p' | tr '\n' ' ')"
+	    env - TMP="$LOCALAPPDATA\\Temp" $session_vars USERPROFILE="$USERPROFILE" "$_1PASS_OP" "$@"
+	    ;;
+	*)
+	    "$_1PASS_OP" "$@"
+	    ;;
+    esac
+}
+    
 function run_op()
 {
-    "$_1PASS_OP" "$@" </dev/null 2>/dev/null
+    run_op_cmd "$@" </dev/null 2>/dev/null
 }
 
 function run_op_with_input()
 {
     local input="$1"
     shift
-    echo "$input" | "$_1PASS_OP" "$@" 2>/dev/null
+    echo "$input" | run_op_cmd "$@" 2>/dev/null
 }
 
 function op_validate_query()
