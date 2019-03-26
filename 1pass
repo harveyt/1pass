@@ -87,8 +87,9 @@ function run_op_cmd()
     case $(uname -s) in
 	CYGWIN_NT-10.0)
 	    local user_profile="$(cygpath -w $HOME)"
+	    local path_op="$(type -p "$_1PASS_OP")"
 	    local session_vars="$(env | sed -n -e 's/^\(OP_SESSION[^=]*\)=\(.*\)/\1=\"\2\"/p' | tr '\n' ' ')"
-	    env - TMP="$LOCALAPPDATA\\Temp" $session_vars USERPROFILE="$user_profile" SystemDrive="$SYSTEMDRIVE" SystemRoot="$SYSTEMROOT" "$_1PASS_OP" "$@"
+	    env - TMP="$LOCALAPPDATA\\Temp" $session_vars USERPROFILE="$user_profile" SystemDrive="$SYSTEMDRIVE" SystemRoot="$SYSTEMROOT" "$path_op" "$@"
 	    ;;
 	*)
 	    "$_1PASS_OP" "$@"
@@ -276,7 +277,10 @@ function op_login_first_time()
 	exit 1
     fi
 
-    eval $(run_op_with_input "$_1PASS_MASTER_PASSWORD" signin "$_1PASS_DOMAIN" "$_1PASS_EMAIL" "$_1PASS_SECRET_KEY")
+    local session_env="$(run_op_with_input "$_1PASS_MASTER_PASSWORD" signin "$_1PASS_DOMAIN" "$_1PASS_EMAIL" "$_1PASS_SECRET_KEY")"
+
+    # Remove Windows Powershell prefix just in case.
+    eval "$(echo "$session_env" | sed -e 's/^$env://')"
 
     # Unset provided environment variable, if incorrect will have to manually ask user.
     # Also ensures this does not persist too long in memory.
