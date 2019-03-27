@@ -93,7 +93,7 @@ function run_op_cmd()
 	CYGWIN_NT-10.0)
 	    local user_profile="$(cygpath -w $HOME)"
 	    local path_op="$(type -p "$_1PASS_OP")"
-	    local session_vars="$(env | sed -n -e 's/^\(OP_SESSION[^=]*\)=\(.*\)/\1=\"\2\"/p' | tr '\n' ' ')"
+	    local session_vars="$(env | sed -n -e 's/^\(OP_SESSION[^=]*\)=\(.*\)/\1=\2/p' | tr '\n' ' ')"
 	    env - TMP="$LOCALAPPDATA\\Temp" $session_vars USERPROFILE="$user_profile" SystemDrive="$SYSTEMDRIVE" SystemRoot="$SYSTEMROOT" "$path_op" "$@"
 	    ;;
 	*)
