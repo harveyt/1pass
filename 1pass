@@ -337,13 +337,12 @@ function op_login()
 	else
 	    op_login_existing $user
 	fi
+
+	local session="$(eval_variable OP_SESSION_${user})"
+	eval export OP_SESSION_${user}=$session
     done
 
     if [[ "$user" != "" ]]; then
-	# Only non-empty if logged in for first time.
-	local session="$(eval_variable OP_SESSION_${user})"
-
-	eval export OP_SESSION_${user}=$session
 	echo "export OP_SESSION_${user}=$session"
     fi
 }
