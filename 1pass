@@ -342,6 +342,8 @@ function op_login()
     if [[ "$user" != "" ]]; then
 	# Only non-empty if logged in for first time.
 	local session="$(eval_variable OP_SESSION_${user})"
+
+	eval export OP_SESSION_${user}=$session
 	echo "export OP_SESSION_${user}=$session"
     fi
 }
@@ -358,6 +360,7 @@ function op_logout()
     if [[ "$user" != "" ]]; then
 	local session="$(eval_variable OP_SESSION_${user})"
 	if [[ "$session" != "" ]]; then
+	    eval unset OP_SESSION_${user}
 	    echo "unset OP_SESSION_${user}"
 	    verb "Session environment cleared."
 	fi
