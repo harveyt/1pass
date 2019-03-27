@@ -29,6 +29,8 @@ Simple frontend 1Password information using 'op' 1Password CLI command.
 -s regexp		Print any titles which match the case-insensitive extended RE 'regexp'.
 -l, --list		List all available titles.
 
+-d uuid			Get the document with the given 'uuid'. Written to stdout.
+
 -v, --verbose		Verbose output to stderr.
 -V, --version		Print version to stderr.
 
@@ -186,6 +188,13 @@ function get_op_user_field()
     local op_value="$(run_op get user "$user_key" | run_jq_raw '.'"$user_field" 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$user_key" "$user_field" "$op_status" "$op_value"
+}
+
+function get_op_document()
+{
+    local item_uuid="$1"
+    run_op get document "$item_uuid"
+    # NOTE: No way to test if this succeeds or not?
 }
 
 # --------------------------------------------------------------------------------
@@ -422,7 +431,7 @@ function op_master_password()
 }
 
 # --------------------------------------------------------------------------------
-short_opts="p:u:U:s:lvVtg"
+short_opts="p:u:U:s:ld:vVtg"
 
 function process_opt()
 {
@@ -443,6 +452,9 @@ function process_opt()
 	    ;;
 	l|list)
 	    list_op_items
+	    ;;
+	d)
+	    get_op_document "$OPTARG"
 	    ;;
 	v|verbose)
 	    _1PASS_VERBOSE=true
