@@ -304,7 +304,10 @@ function op_login_existing()
 	exit 1
     fi
 
-    eval $(run_op_with_input "$_1PASS_MASTER_PASSWORD" signin $user)
+    local session_env="$(run_op_with_input "$_1PASS_MASTER_PASSWORD" signin $user)"
+
+    # Remove Windows Powershell prefix just in case.
+    eval "$(echo "$session_env" | sed -e 's/^$env://')"
 
     # Unset provided environment variable, if incorrect will have to manually ask user.
     # Also ensures this does not persist too long in memory.
