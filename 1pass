@@ -82,6 +82,11 @@ function eval_variable()
 # --------------------------------------------------------------------------------
 # 1Password query
 #
+function run_jq_raw()
+{
+    "$_1PASS_JQ" -r "$@" | tr -d ''
+}
+
 function run_op_cmd()
 {
     case $(uname -s) in
@@ -123,7 +128,7 @@ function get_op_item_field()
     local item_key="$1"
     local item_field_type="$2"
     local item_field="$3"
-    local op_value="$(run_op get item "$item_key" | "$_1PASS_JQ" -r '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
+    local op_value="$(run_op get item "$item_key" | run_jq_raw '.details.fields[] | select(.'"$item_field_type"'=="'"$item_field"'").value' 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -132,7 +137,7 @@ function get_op_item_overview()
 {
     local item_key="$1"
     local item_field="$2"
-    local op_value="$(run_op get item "$item_key" | "$_1PASS_JQ" -r '.overview.'"$item_field" 2>/dev/null)"
+    local op_value="$(run_op get item "$item_key" | run_jq_raw '.overview.'"$item_field" 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$item_key" "$item_field" "$op_status" "$op_value"
 }
@@ -157,7 +162,7 @@ function get_op_item_url()
 
 function list_op_items()
 {
-    run_op list items | "$_1PASS_JQ" -r '.[] | select(.templateUuid == "001").overview.title' | sort
+    run_op list items | run_jq_raw '.[] | select(.templateUuid == "001").overview.title' | sort
     local op_status=${PIPESTATUS[0]}
     if [[ $op_status -ne 0 ]]; then
 	error "cannot get list of 1Password items"
@@ -178,7 +183,7 @@ function get_op_user_field()
 {
     local user_key="$1"
     local user_field="$2"
-    local op_value="$(run_op get user "$user_key" | "$_1PASS_JQ" -r '.'"$user_field" 2>/dev/null)"
+    local op_value="$(run_op get user "$user_key" | run_jq_raw '.'"$user_field" 2>/dev/null)"
     local op_status=${PIPESTATUS[0]}
     op_validate_query "$user_key" "$user_field" "$op_status" "$op_value"
 }
@@ -236,7 +241,7 @@ function op_latest_signin()
     if [[ ! -f "$_1PASS_CONFIG" ]]; then
 	return
     fi
-    "$_1PASS_JQ" -r '.latest_signin' <"$_1PASS_CONFIG" 2>/dev/null
+    run_jq_raw '.latest_signin' <"$_1PASS_CONFIG" 2>/dev/null
 }
 
 function op_config_value()
@@ -246,7 +251,7 @@ function op_config_value()
     if [[ ! -f "$_1PASS_CONFIG" ]]; then
 	return
     fi
-    "$_1PASS_JQ" -r '.accounts[] | select(.shorthand == "'"$user"'").'"$field"'' <"$_1PASS_CONFIG" 2>/dev/null
+    run_jq_raw '.accounts[] | select(.shorthand == "'"$user"'").'"$field"'' <"$_1PASS_CONFIG" 2>/dev/null
 }
 
 function op_login_first_time()
