@@ -29,6 +29,7 @@ Simple frontend 1Password information using 'op' 1Password CLI command.
 -s regexp		Print any titles which match the case-insensitive extended RE 'regexp'.
 -l, --list		List all available titles.
 
+-D, --docs		List all available documents.
 -d uuid			Get the document with the given 'uuid'. Written to stdout.
 
 -v, --verbose		Verbose output to stderr.
@@ -168,6 +169,15 @@ function list_op_items()
     local op_status=${PIPESTATUS[0]}
     if [[ $op_status -ne 0 ]]; then
 	error "cannot get list of 1Password items"
+    fi
+}
+
+function list_op_docs()
+{
+    run_op list documents | run_jq_raw '.[] | select(.templateUuid == "006") | "\(.uuid) \(.overview.title)"' | sort -k +2
+    local op_status=${PIPESTATUS[0]}
+    if [[ $op_status -ne 0 ]]; then
+	error "cannot get list of 1Password docs"
     fi
 }
 
@@ -479,6 +489,9 @@ function process_opt()
 	    ;;
 	l|list)
 	    list_op_items
+	    ;;
+	D|docs)
+	    list_op_docs
 	    ;;
 	d)
 	    get_op_document "$OPTARG"
