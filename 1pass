@@ -34,8 +34,8 @@ Simple frontend 1Password information using 'op' 1Password CLI command.
 -v, --verbose		Verbose output to stderr.
 -V, --version		Print version to stderr.
 
--t, --terminal		Force use of TTY terminal for any password input.
--g, --gui		Force use of GUI for any password input.
+-t, --terminal		Force use of TTY terminal for all input. Master password not shown.
+-g, --gui		Force use of GUI for all input.
 
 --login			Ensure session is logged in.
 			Must evaluate in shell (eg. 'eval \$(1pass --login)')
@@ -215,24 +215,39 @@ function read_password_terminal()
     echo "$pass"
 }
 
+function read_normal_terminal()
+{
+    local prompt="$1"
+    local pass=""
+
+    read -p "$prompt: " pass
+    echo "$pass"
+}
+
 function read_password_gui()
 {
     SSH_ASKPASS_TITLE="1Password" "$_1PASS_ASKPASS" "$prompt" 2>/dev/null
 }
 
-function read_password()
+function read_normal_gui()
 {
-    local prompt="$1"
-    local var="$2"
-    local default="$3"
+    read_password_gui "$1"
+}
+
+function read_style()
+{
+    local style="$1"
+    local prompt="$2"
+    local var="$3"
+    local default="$4"
     
     while true
     do
 	local var_value="$(eval_variable $var)"
 	[[ "$var_value" != "" ]] && break
 
-	eval $var=\""$(read_password_$_1PASS_INPUT "$prompt")"\" read_password_status=\$?
-	if [[ $read_password_status -ne 0 ]]; then
+	eval $var=\""$(read_${style}_$_1PASS_INPUT "$prompt")"\" read_status=\$?
+	if [[ $read_status -ne 0 ]]; then
 	    return 1
 	fi
 
@@ -243,6 +258,16 @@ function read_password()
 	fi
     done
     return 0
+}
+
+function read_password()
+{
+    read_style password "$1" "$2" "$3"
+}
+
+function read_normal()
+{
+    read_style normal "$1" "$2" "$3"
 }
 
 function op_latest_signin()
@@ -267,19 +292,19 @@ function op_login_first_time()
 {
     local default_domain="my.1password.com"
     
-    if ! read_password "Domain (default: $default_domain)" _1PASS_DOMAIN $default_domain
+    if ! read_normal "Domain (default: $default_domain)" _1PASS_DOMAIN $default_domain
     then
 	verb "Login cancelled"
 	exit 1
     fi
 
-    if ! read_password "E-mail" _1PASS_EMAIL
+    if ! read_normal "E-mail" _1PASS_EMAIL
     then
 	verb "Login cancelled"
 	exit 1
     fi
 
-    if ! read_password "Secret Key" _1PASS_SECRET_KEY
+    if ! read_normal "Secret Key" _1PASS_SECRET_KEY
     then
 	verb "Login cancelled"
 	exit 1
