@@ -50,6 +50,7 @@ Simple frontend 1Password information using 'op' 1Password CLI command.
 --secret-key		Print the latest signed in account's secret.
 --account-name		Print the latest signed in account name which contains master password.
 --master-password	Print the latest signed in account's master.
+--check-binaries	Print the require binary paths and versions. Exit status 0 if ok, 1 if not.
 " >&2
     exit 1
 }
@@ -467,6 +468,29 @@ function op_master_password()
     get_op_item_password "$account_name"
 }
 
+function op_check_binaries()
+{
+    local check=$1
+    local status=0
+    
+    if [[ $(type -p "$_1PASS_OP") == "" ]]; then
+	status=1
+	echo "1Password 'op' missing:  _1PASS_OP=$_1PASS_OP"
+    elif [[ "$check" == "exit" ]]; then
+	echo "1Password 'op' version:  $(op --version 2>/dev/null)"
+    fi
+    if [[ $(type -p "$_1PASS_JQ") == "" ]]; then
+	status=1
+	echo "JSON query 'jq' missing: _1PASS_JQ=$_1PASS_JQ"
+    elif [[ "$check" == "exit" ]]; then
+	echo "JSON query 'jq' version: $(jq --version 2>/dev/null)"
+    fi
+
+    if [[ "$check" == "exit" || "$status" != "0" ]]; then
+	exit $status
+    fi
+}
+
 # --------------------------------------------------------------------------------
 short_opts="p:u:U:s:ld:vVtg"
 
@@ -535,6 +559,9 @@ function process_opt()
 	master-password)
 	    op_master_password
 	    ;;
+	check-binaries)
+	    op_check_binaries exit
+	    ;;
 	*)
 	    usage
 	    ;;
@@ -544,6 +571,7 @@ function process_opt()
 # --------------------------------------------------------------------------------
 # Main
 
+op_check_binaries continue
 while getopts "${short_opts}-:" c
 do
     case "$c" in
